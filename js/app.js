@@ -33,7 +33,7 @@
 
   const S = {
     screen: 'login',
-    pass: '', token: '',
+    token: '',
     gpa: null, prefs: [],
     answer: null, A: null,
     busy: false, error: '', tokenError: '',
@@ -42,7 +42,6 @@
   };
 
   const ERRORS = {
-    bad_pass: '合言葉が違います。クラスで共有された合言葉を確かめてください。',
     bad_token: '回答コードが見つかりません。入力に誤りがないか確かめてください。',
     bad_gpa: 'GPAは0.00〜4.00の範囲で入力してください。',
     bad_prefs: `希望は${MIN}つ以上、重複なしで選んでください。`,
@@ -57,7 +56,7 @@
   // ---------- 通信 ----------
 
   async function call(action, extra = {}) {
-    const body = Object.assign({ action, pass: S.pass }, S.token ? { token: S.token } : {}, extra);
+    const body = Object.assign({ action }, S.token ? { token: S.token } : {}, extra);
     if (DEMO) return window.DemoServer.handle(body);
     let res;
     try {
@@ -324,13 +323,8 @@
       </section>
 
       <div class="panel login-panel">
-        <label class="field">
-          <span class="field-label">合言葉</span>
-          <input id="pass" autocomplete="off" spellcheck="false" value="${esc(S.pass)}" enterkeyhint="go">
-          <span class="field-help">クラスで共有された合言葉です。共有リンクから開いた場合は入力済みです。</span>
-        </label>
         <p class="form-error" role="alert">${esc(S.error)}</p>
-        <button type="button" class="btn primary wide-btn" data-act="start" ${S.busy ? 'disabled' : ''}>${S.busy ? '確認しています…' : '回答をはじめる'}</button>
+        <button type="button" class="btn primary wide-btn" data-act="start" ${S.busy ? 'disabled' : ''}>回答をはじめる</button>
         <p class="fine">送信すると「回答コード」が発行され、この端末に保存されます。回答の修正と結果の閲覧はこのコードで行います。</p>
 
         <details class="restore"${S.tokenError ? ' open' : ''}>
@@ -343,19 +337,12 @@
           <button type="button" class="btn ghost wide-btn" data-act="restore" ${S.busy ? 'disabled' : ''}>回答コードで入る</button>
         </details>
       </div>
-      ${DEMO ? `<p class="demo-note">デモモードで動いています。サーバーのURLが未設定のため、架空の回答64件と、このブラウザで入力した回答だけで集計します。合言葉は何を入れても通ります。</p>` : ''}
+      ${DEMO ? `<p class="demo-note">デモモードで動いています。サーバーのURLが未設定のため、架空の回答64件と、このブラウザで入力した回答だけで集計します。</p>` : ''}
     </main>`;
   }
 
-  async function start() {
-    const pass = document.getElementById('pass').value.trim();
-    if (!pass) { S.error = '合言葉を入力してください。'; renderLogin(); return; }
-    S.pass = pass; S.token = ''; S.error = ''; S.tokenError = ''; S.busy = true;
-    renderLogin();
-    const r = await call('login');
-    S.busy = false;
-    if (!r.ok) { S.error = errorText(r.error); renderLogin(); return; }
-    local.set('ls_pass', S.pass);
+  function start() {
+    S.token = ''; S.error = ''; S.tokenError = '';
     S.answer = null;
     const draft = readDraft();
     S.gpa = draft ? draft.gpa : null;
@@ -382,7 +369,6 @@
       return;
     }
     S.token = r.token;
-    local.set('ls_pass', S.pass);
     local.set('ls_token', S.token);
     S.answer = r.answer;
     S.gpa = r.answer.gpa;
@@ -392,10 +378,7 @@
   }
 
   function restore() {
-    const pass = document.getElementById('pass').value.trim();
     const token = normToken(document.getElementById('token-in').value);
-    if (!pass) { S.error = '合言葉を入力してください。'; S.tokenError = ''; renderLogin(); return; }
-    S.pass = pass;
     if (!TOKEN_RE.test(token)) {
       S.tokenError = '回答コードは英数字10文字です(ハイフンはあってもなくても構いません)。';
       S.error = '';
@@ -916,7 +899,6 @@
 
   $app.addEventListener('keydown', e => {
     if (e.key !== 'Enter') return;
-    if (e.target.id === 'pass') { e.preventDefault(); start(); }
     if (e.target.id === 'token-in') { e.preventDefault(); restore(); }
   });
 
@@ -988,14 +970,8 @@
   // ---------- 起動 ----------
 
   (function init() {
-    const m = location.hash.match(/(?:^#|&)k=([^&]+)/);
-    if (m) {
-      local.set('ls_pass', decodeURIComponent(m[1]));
-      history.replaceState(null, '', location.pathname + location.search);
-    }
-    S.pass = local.get('ls_pass') || '';
     const token = normToken(local.get('ls_token'));
-    if (S.pass && TOKEN_RE.test(token)) enterWithToken(token, true);
+    if (TOKEN_RE.test(token)) enterWithToken(token, true);
     else render();
   })();
 })();

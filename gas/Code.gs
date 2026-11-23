@@ -5,9 +5,6 @@
  * 名前や学籍番号は扱わない。初回送信時に発行する「回答コード」のハッシュ、GPA、希望順位、日時だけを残す。
  */
 
-// クラスで共有する合言葉。必ず変更してから setup を実行すること。
-const ACCESS_CODE = 'ここを合言葉に変更';
-
 // 送信に必要な希望の最小数。js/config.js の MIN_CHOICES と揃えること。
 const MIN_CHOICES = 3;
 
@@ -18,15 +15,22 @@ const TOKEN_CHARS = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
 const TOKEN_LENGTH = 10;
 const TOKEN_RE = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$/;
 const MAX_NEW_PER_MINUTE = 60;
-const UNSET_CODE = 'ここを合言葉に変更';
 
-/** 最初に一度だけエディタから実行する。シートの用意とハッシュ用の秘密値の生成をする。 */
+/**
+ * 最初に一度だけエディタから実行する。保存先スプレッドシートの ID を覚え、シートとハッシュ用の秘密値を用意する。
+ * ウェブアプリからは「つながっているスプレッドシート」を取得できないため、ID で開けるようにしておく必要がある。
+ * スプレッドシートから開いていない単独のスクリプトでは、先にスクリプト プロパティ SHEET_ID にスプレッドシートの ID を入れておく。
+ */
 function setup() {
-  if (ACCESS_CODE === UNSET_CODE) throw new Error('ACCESS_CODE を合言葉に書き換えてから実行してください。');
   const props = PropertiesService.getScriptProperties();
-  if (!props.getProperty('SALT')) props.setProperty('SALT', Utilities.getUuid() + Utilities.getUuid());
+  const active = SpreadsheetApp.getActiveSpreadsheet();
+  if (active) props.setProperty('SHEET_ID', active.getId());
+  if (!props.getProperty('SHEET_ID')) {
+    throw new Error('スプレッドシートの「拡張機能 > Apps Script」から開いたエディタで実行するか、スクリプト プロパティ SHEET_ID を設定してください。');
+  }
+  salt_();
   getSheet_();
-  console.log('準備ができました。続けて「デプロイ > 新しいデプロイ」からウェブアプリとして公開してください。');
+  console.log('準備ができました。');
 }
 
 function doGet() {
@@ -49,9 +53,7 @@ function doPost(e) {
 }
 
 function handle_(req) {
-  const salt = PropertiesService.getScriptProperties().getProperty('SALT');
-  if (!salt || ACCESS_CODE === UNSET_CODE) return { ok: false, error: 'server_not_configured' };
-  if (String(req.pass || '').trim() !== ACCESS_CODE) return { ok: false, error: 'bad_pass' };
+  const salt = salt_();
 
   const hasToken = req.token !== undefined && req.token !== null && req.token !== '';
   const token = String(req.token || '').toUpperCase().replace(/[^0-9A-Z]/g, '');
@@ -113,8 +115,34 @@ function handle_(req) {
   return { ok: false, error: 'bad_request' };
 }
 
-function getSheet_() {
+function salt_() {
+  const props = PropertiesService.getScriptProperties();
+  let salt = props.getProperty('SALT');
+  if (salt) return salt;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    salt = props.getProperty('SALT');
+    if (!salt) {
+      salt = Utilities.getUuid() + Utilities.getUuid();
+      props.setProperty('SALT', salt);
+    }
+    return salt;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function spreadsheet_() {
+  const id = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+  if (id) return SpreadsheetApp.openById(id);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) throw new Error('setup が実行されていません。');
+  return ss;
+}
+
+function getSheet_() {
+  const ss = spreadsheet_();
   let sheet = ss.getSheetByName(SHEET_NAME);
   if (!sheet) {
     sheet = ss.insertSheet(SHEET_NAME);

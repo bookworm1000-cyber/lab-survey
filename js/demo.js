@@ -72,7 +72,6 @@
   }
 
   function handle(req) {
-    if (!String(req.pass || '').trim()) return { ok: false, error: 'bad_pass' };
     const hasToken = req.token !== undefined && req.token !== null && req.token !== '';
     const token = String(req.token || '').toUpperCase().replace(/[^0-9A-Z]/g, '');
     if (hasToken && !TOKEN_RE.test(token)) return { ok: false, error: 'bad_token' };

@@ -1,7 +1,7 @@
 window.SURVEY_CONFIG = {
   // Apps Script をウェブアプリとしてデプロイしたときの URL(https://script.google.com/macros/s/…/exec)。
   // 空のままだとデモモード(架空の回答とこのブラウザ内の回答だけで動く)になる。
-  API_URL: '',
+  API_URL: 'https://script.google.com/macros/s/AKfycbx32vPtSDWsiWsDssMWuvR01rAvZolFoBZAE_aoH7QO3cdYQBgWgYocEGZNQ0fLlF3_qg/exec',
 
   // 送信に必要な希望の最小数。gas/Code.gs の MIN_CHOICES と揃えること。
   MIN_CHOICES: 3,
